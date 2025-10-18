@@ -33,10 +33,11 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# 기존 컨테이너 정리 (필요한 경우)
-if [ "$(docker ps -q -f name=nara-chart)" ]; then
-    echo -e "${YELLOW}⚠️  기존 컨테이너가 실행 중입니다. 재시작합니다...${NC}"
-    docker-compose -f docker-compose-dev.yml --env-file .env.dev down
+# 기존 컨테이너 정리 (재시작)
+if [ "$(docker ps -a -q -f name=nara-chart)" ]; then
+    echo -e "${YELLOW}🔄 기존 컨테이너를 중지하고 재시작합니다...${NC}"
+    docker-compose -f docker-compose-dev.yml --env-file .env.dev down -v
+    echo ""
 fi
 
 echo -e "${GREEN}🚀 개발 환경 시작 중...${NC}"
@@ -66,9 +67,4 @@ echo -e "  - Backend:      ${GREEN}http://localhost:8000${NC}"
 echo -e "  - API Docs:     ${GREEN}http://localhost:8000/docs${NC}"
 echo -e "  - PostgreSQL:   ${GREEN}localhost:5432${NC}"
 echo -e "  - Redis:        ${GREEN}localhost:6379${NC}"
-echo ""
-echo -e "${BLUE}🛠️  유용한 명령어:${NC}"
-echo -e "  - 로그 확인:    ${YELLOW}docker-compose -f docker-compose-dev.yml --env-file .env.dev logs -f${NC}"
-echo -e "  - 컨테이너 중지: ${YELLOW}./stop-dev.sh${NC}"
-echo -e "  - 재시작:       ${YELLOW}./start-dev.sh${NC}"
 echo ""

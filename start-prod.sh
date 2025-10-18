@@ -38,10 +38,33 @@ fi
 echo -e "${BLUE}📁 필요한 디렉토리 생성 중...${NC}"
 mkdir -p data/postgres data/redis logs/backend logs/nginx logs/nginx-proxy backups backups/postgres scripts ssl nginx/conf.d
 
-# 기존 컨테이너 확인
+# 기존 컨테이너 확인 및 백업
 if [ "$(docker ps -q -f name=nara-chart)" ]; then
-    echo -e "${YELLOW}⚠️  기존 컨테이너가 실행 중입니다. 재시작합니다...${NC}"
+    echo -e "${YELLOW}🔄 기존 컨테이너가 실행 중입니다. 백업 후 재시작합니다...${NC}"
+    echo ""
+
+    # 백업 수행
+    if [ -f .env.prod ]; then
+        source .env.prod
+    fi
+
+    POSTGRES_USER=${POSTGRES_USER:-nara_prod_user}
+    POSTGRES_DB=${POSTGRES_DB:-nara_chart_production}
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+    echo -e "${BLUE}💾 데이터베이스 백업 중...${NC}"
+    docker-compose -f docker-compose-prod.yml --env-file .env.prod exec -T postgres pg_dump -U ${POSTGRES_USER} ${POSTGRES_DB} > "backups/backup_${TIMESTAMP}.sql" 2>/dev/null
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 백업 완료: backups/backup_${TIMESTAMP}.sql${NC}"
+    else
+        echo -e "${YELLOW}⚠️  백업을 건너뜁니다 (컨테이너가 준비되지 않았을 수 있습니다)${NC}"
+    fi
+
+    echo ""
+    echo -e "${YELLOW}🛑 기존 컨테이너 중지 중...${NC}"
     docker-compose -f docker-compose-prod.yml --env-file .env.prod down
+    echo ""
 fi
 
 # 백업 서비스 포함 여부
@@ -70,6 +93,5 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}🛠️  유용한 명령어:${NC}"
 echo -e "  - 로그 확인:    ${YELLOW}docker-compose -f docker-compose-prod.yml --env-file .env.prod logs -f${NC}"
-echo -e "  - 컨테이너 중지: ${YELLOW}./stop-prod.sh${NC}"
 echo -e "  - 재시작:       ${YELLOW}./start-prod.sh${NC}"
 echo ""
