@@ -8,29 +8,21 @@ name = "pypi"
 fastapi = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 gunicorn = "*"
-
-# Database
 sqlalchemy = "*"
 psycopg2-binary = "*"
 alembic = "*"
-
-# Redis
 redis = "*"
-
-# Utils
 python-dotenv = "*"
 pandas = "*"
 openpyxl = "*"
 xlrd = "*"
+pydantic-settings = "*"
 
 [dev-packages]
-# Testing
 pytest = "*"
 pytest-cov = "*"
 pytest-asyncio = "*"
 httpx = "*"
-
-# Development Tools
 black = "*"
 flake8 = "*"
 mypy = "*"
