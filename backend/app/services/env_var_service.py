@@ -1,6 +1,6 @@
 import redis
 from sqlalchemy.orm import Session
-from typing import Optional, Dict
+from typing import Dict
 from app.db.cruds.env_var_crud import EnvVarCRUD
 from app.clients.redis_client import get_redis_client
 
@@ -44,7 +44,7 @@ class EnvVarService:
         print(f"✓ PostgreSQL에서 Redis로 {count}개 환경변수 로드 완료")
         return count
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         """환경변수 조회 (Redis 우선)"""
         redis_key = self._make_redis_key(key)
         value = self.redis.get(redis_key)

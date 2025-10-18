@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Dict
 from datetime import datetime
 
 
@@ -21,7 +21,7 @@ class EnvVarUpdate(BaseModel):
 
 class EnvVarResponse(EnvVarBase):
     """환경변수 응답 스키마"""
-    updated_at: Optional[datetime] = Field(None, description="마지막 업데이트 시간")
+    updated_at: datetime | None = Field(None, description="마지막 업데이트 시간")
 
     class Config:
         from_attributes = True
@@ -48,4 +48,4 @@ class EnvVarOperationResponse(BaseModel):
     """환경변수 작업 응답 스키마"""
     success: bool = Field(..., description="작업 성공 여부")
     message: str = Field(..., description="작업 결과 메시지")
-    count: Optional[int] = Field(None, description="처리된 환경변수 개수")
+    count: int | None = Field(None, description="처리된 환경변수 개수")

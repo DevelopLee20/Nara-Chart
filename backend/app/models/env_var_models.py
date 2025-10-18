@@ -1,5 +1,9 @@
 from sqlalchemy import Column, String, DateTime
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
+from datetime import datetime
+from typing import cast
+
 from app.db.database import Base
 
 
@@ -11,9 +15,9 @@ class EnvVar(Base):
     """
     __tablename__ = "env_vars"
 
-    key = Column(String, primary_key=True, index=True, nullable=False, comment="환경변수 키")
-    value = Column(String, nullable=False, comment="환경변수 값")
-    updated_at = Column(
+    key: Mapped[str] = mapped_column(String, primary_key=True, index=True, comment="환경변수 키")
+    value: Mapped[str] = mapped_column(String, nullable=False, comment="환경변수 값")
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
@@ -26,8 +30,10 @@ class EnvVar(Base):
 
     def to_dict(self):
         """모델을 딕셔너리로 변환"""
+        updated = cast(datetime | None, self.updated_at)
+
         return {
             "key": self.key,
             "value": self.value,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+            "updated_at": updated.isoformat() if updated else None
         }

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List
 from app.models.bid_models import DataModel
 
 
@@ -9,14 +9,14 @@ class BidCRUD:
     """
 
     @staticmethod
-    def get_bid(db: Session, bid_id: int) -> Optional[DataModel]:
+    def get_bid(db: Session, bid_id: int) -> DataModel | None:
         """
         ID로 입찰 데이터 조회
         """
         return db.query(DataModel).filter(DataModel.id == bid_id).first()
 
     @staticmethod
-    def get_bid_by_number(db: Session, bid_number: str) -> Optional[DataModel]:
+    def get_bid_by_number(db: Session, bid_number: str) -> DataModel | None:
         """
         입찰 공고번호로 입찰 데이터 조회
         """
@@ -48,7 +48,7 @@ class BidCRUD:
         return db_bid
 
     @staticmethod
-    def update_bid(db: Session, bid_id: int, bid_data: dict) -> Optional[DataModel]:
+    def update_bid(db: Session, bid_id: int, bid_data: dict) -> DataModel | None:
         """
         입찰 데이터 업데이트
 

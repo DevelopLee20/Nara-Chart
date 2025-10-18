@@ -1,5 +1,4 @@
 import redis
-from typing import Optional
 from app.core.env import settings
 
 
@@ -10,7 +9,7 @@ class RedisClient:
     - 연결 풀 관리
     """
 
-    _instance: Optional[redis.Redis] = None
+    _instance: redis.Redis | None = None
 
     @classmethod
     def get_client(cls) -> redis.Redis:

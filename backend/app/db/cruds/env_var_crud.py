@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -25,13 +25,13 @@ class EnvVarCRUD:
         return {env_var.key: env_var.value for env_var in EnvVarCRUD.get_all(db)}
 
     @staticmethod
-    def get_by_key(db: Session, key: str) -> Optional[EnvVar]:
+    def get_by_key(db: Session, key: str) -> EnvVar | None:
         """Retrieve a single environment variable by key."""
         result = db.execute(EnvVarCRUD._select_by_key(key))
         return result.scalar_one_or_none()
 
     @staticmethod
-    def get_value_by_key(db: Session, key: str) -> Optional[str]:
+    def get_value_by_key(db: Session, key: str) -> str | None:
         """Return only the value associated with the given key, if present."""
         stmt = select(EnvVar.value).where(EnvVar.key == key)
         result = db.execute(stmt)
@@ -47,7 +47,7 @@ class EnvVarCRUD:
         return env_var
 
     @staticmethod
-    def update(db: Session, key: str, value: str) -> Optional[EnvVar]:
+    def update(db: Session, key: str, value: str) -> EnvVar | None:
         """Update an existing environment variable if it exists."""
         env_var = EnvVarCRUD.get_by_key(db, key)
         if env_var is None:
