@@ -1,0 +1,170 @@
+services:
+  # PostgreSQL Database - Development
+  postgres:
+    image: postgres:15-alpine
+    container_name: nara-chart-postgres-dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nara_dev_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nara_dev_password_123}
+      POSTGRES_DB: ${POSTGRES_DB:-nara_chart_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      # 개발용 초기화 스크립트 (옵션)
+      # - ./backend/scripts/init-dev.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - nara-network-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nara_dev_user}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis Cache - Development
+  redis:
+    image: redis:7-alpine
+    container_name: nara-chart-redis-dev
+    command: redis-server --appendonly yes --loglevel debug
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - nara-network-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # FastAPI Backend - Development
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: nara-chart-backend-dev
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nara_dev_user}:${POSTGRES_PASSWORD:-nara_dev_password_123}@postgres:5432/${POSTGRES_DB:-nara_chart_dev}
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      # App settings
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-for-development-only-do-not-use-in-production}
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      # Hot reload
+      RELOAD: "true"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+      # 디버깅 포트 (옵션)
+      - "${DEBUG_PORT:-5678}:5678"
+    volumes:
+      # 소스 코드 실시간 반영
+      - ./backend:/app
+      - backend_dev_data:/app/data
+      # Python 캐시 제외
+      - /app/__pycache__
+      - /app/.pytest_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nara-network-dev
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # React Frontend - Development
+  frontend:
+    build:
+      context: ./frontend/app
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: nara-chart-frontend-dev
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
+      - NODE_ENV=${NODE_ENV:-development}
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      # 소스 코드 실시간 반영
+      - ./frontend/app:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - nara-network-dev
+    command: npm start
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Redis Commander - 개발용 Redis GUI (옵션)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: nara-chart-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - nara-network-dev
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+  # pgAdmin - 개발용 PostgreSQL GUI (옵션)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: nara-chart-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@nara.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    networks:
+      - nara-network-dev
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+networks:
+  nara-network-dev:
+    driver: bridge
+    name: nara-network-dev
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  backend_dev_data:
+    driver: local
+  pgadmin_dev_data:
+    driver: local

@@ -144,6 +144,26 @@ ENV/
 env.bak/
 venv.bak/
 
+# Docker Environment files (중요!)
+.env.prod
+.env.*.local
+*.env.prod
+
+# Docker
+docker-compose.override.yml
+
+# Data directories
+data/
+backups/
+logs/
+dev-data/
+
+# SSL certificates
+ssl/
+*.pem
+*.key
+*.crt
+
 # Spyder project settings
 .spyderproject
 .spyproject
