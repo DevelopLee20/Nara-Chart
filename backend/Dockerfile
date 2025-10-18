@@ -2,7 +2,7 @@
 # Multi-stage build for optimized production image
 
 # Build stage
-FROM python:3.13-bullseye AS builder
+FROM python:3.12-bullseye AS builder
 
 WORKDIR /app
 

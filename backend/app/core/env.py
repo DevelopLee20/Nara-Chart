@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
 
     # Redis Configuration
+    REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
 
     # Backend Configuration
