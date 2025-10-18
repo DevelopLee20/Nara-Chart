@@ -2,7 +2,7 @@
 # Multi-stage build for optimized production image
 
 # Build stage
-FROM python:3.9-slim AS builder
+FROM python:3.13-bullseye AS builder
 
 WORKDIR /app
 
@@ -22,11 +22,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Pipenv 설치
 RUN pip install --no-cache-dir pipenv
 
-# Pipfile과 Pipfile.lock 복사
-COPY Pipfile Pipfile.lock ./
+# Pipfile 복사
+COPY Pipfile ./
 
-# 의존성 설치
-RUN pipenv install --system --deploy --ignore-pipfile
+# Pipfile.lock 생성 및 의존성 설치
+RUN pipenv lock && \
+    pipenv install --system --deploy --ignore-pipfile
 
 # 프로덕션 패키지 설치
 RUN pip install --no-cache-dir \
@@ -38,7 +39,7 @@ RUN pip install --no-cache-dir \
     gunicorn
 
 # Production stage
-FROM python:3.9-slim as production
+FROM python:3.13-bullseye AS production
 
 # 빌드 인자
 ARG BUILD_DATE
@@ -61,7 +62,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # 빌드 스테이지에서 Python 패키지 복사
-COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # 애플리케이션 코드 복사

@@ -1,6 +1,6 @@
 # Backend Development Dockerfile for FastAPI
 
-FROM python:3.9-slim AS development
+FROM python:3.13-bullseye as development
 
 # 작업 디렉토리 설정
 WORKDIR /app
@@ -24,11 +24,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Pipenv 설치
 RUN pip install --no-cache-dir pipenv
 
-# Pipfile과 Pipfile.lock 복사
-COPY Pipfile Pipfile.lock ./
+# Pipfile 복사
+COPY Pipfile ./
 
-# 의존성 설치 (시스템 패키지로 설치)
-RUN pipenv install --system --deploy --ignore-pipfile
+# Pipfile.lock 생성 및 의존성 설치
+RUN pipenv lock && \
+    pipenv install --system --deploy --ignore-pipfile
 
 # 개발용 추가 패키지 설치
 RUN pip install --no-cache-dir \
