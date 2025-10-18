@@ -1,0 +1,135 @@
+
+import pandas as pd
+import httpx
+import asyncio
+from datetime import datetime
+
+class BidDataUploader:
+    """
+    엑셀 파일에서 입찰 데이터를 읽어 API를 통해 업로드하는 클래스
+    """
+
+    def __init__(self, base_url: str = "http://127.0.0.1:8000"):
+        self.base_url = base_url.rstrip('/')
+        self.api_endpoint = f"{self.base_url}/api/bids/"
+        self.column_mapping = {
+            "타입": "bid_type",
+            "참가마감": "participation_deadline",
+            "투찰마감": "bid_deadline",
+            "입찰일": "bid_date",
+            "발주기관": "organization",
+            "공고명": "title",
+            "공고번호": "bid_number",
+            "업종": "industry",
+            "지역": "region",
+            "추정가격": "estimated_price",
+            "기초금액": "base_price",
+            "1순위업체": "first_rank_company",
+            "낙찰금액": "winning_price",
+            "기초/낙찰": "base_winning_rate",
+            "추정/낙찰": "estimated_winning_rate",
+        }
+
+    def _preprocess_data(self, df: pd.DataFrame) -> list[dict]:
+        """
+        데이터프레임을 API 스키마에 맞게 전처리합니다.
+        """
+        df = df.rename(columns=self.column_mapping)
+        
+        # 필수 컬럼 확인
+        required_cols = ["title", "bid_number"]
+        for col in required_cols:
+            if col not in df.columns:
+                raise ValueError(f"필수 컬럼이 누락되었습니다: {col}")
+
+        # 날짜 컬럼 포맷 변경
+        date_cols = ["participation_deadline", "bid_deadline", "bid_date"]
+        for col in date_cols:
+            if col in df.columns:
+                # datetime으로 변환, 실패 시 NaT
+                s = pd.to_datetime(df[col], errors='coerce')
+                # NaT가 아닌 경우에만 날짜 형식으로 변환, NaT는 None으로 남김
+                df[col] = s.dt.strftime('%Y-%m-%d')
+                df.loc[s.isna(), col] = None
+
+
+        # 숫자 컬럼 처리
+        numeric_cols = ["estimated_price", "base_price", "winning_price", "base_winning_rate", "estimated_winning_rate"]
+        for col in numeric_cols:
+            if col in df.columns:
+                # 숫자로 변환, 변환할 수 없는 값은 NaN으로
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        # DataFrame 전체의 NaN 값을 Python의 None으로 변환
+        # to_dict() 전에 실행해야 JSON 직렬화 오류를 막을 수 있음
+        df = df.astype(object).where(df.notna(), None)
+        
+        return df.to_dict(orient="records")
+
+    async def upload_from_excel(self, file_path: str):
+        """
+        엑셀 파일 경로를 받아 데이터를 API에 업로드합니다.
+        """
+        try:
+            df = pd.read_excel(file_path)
+        except FileNotFoundError:
+            print(f"오류: 파일을 찾을 수 없습니다 - {file_path}")
+            return
+        except Exception as e:
+            print(f"오류: 엑셀 파일을 읽는 중 문제가 발생했습니다 - {e}")
+            return
+
+        records = self._preprocess_data(df)
+        total = len(records)
+        success_count = 0
+        fail_count = 0
+
+        print(f"총 {total}개의 데이터를 업로드합니다...")
+
+        async with httpx.AsyncClient() as client:
+            for i, record in enumerate(records):
+                try:
+                    response = await client.post(self.api_endpoint, json=record, timeout=10) 
+                    
+                    if response.status_code == 201:
+                        print(f"({i+1}/{total}) 성공: {record.get('title', '')[:30]}...")
+                        success_count += 1
+                    elif response.status_code == 409:
+                        print(f"({i+1}/{total}) 건너뜀 (이미 존재): {record.get('bid_number')}")
+                        fail_count += 1
+                    else:
+                        print(f"({i+1}/{total}) 실패: {record.get('title', '')[:30]}... (상태 코드: {response.status_code})")
+                        print(f"  - 응답: {response.text}")
+                        fail_count += 1
+
+                except httpx.RequestError as e:
+                    print(f"({i+1}/{total}) 실패: API 요청 중 오류 발생 - {e}")
+                    fail_count += 1
+                
+                await asyncio.sleep(0.1) # 부하 감소를 위한 약간의 딜레이
+
+        print("\n--- 업로드 완료 ---")
+        print(f"성공: {success_count}건")
+        print(f"실패/건너뜀: {fail_count}건")
+
+
+async def main():
+    """
+    사용 예시:
+    1. `BidDataUploader` 인스턴스 생성
+    2. `upload_from_excel` 메소드에 엑셀 파일 경로를 전달하여 실행
+    """
+    # 이 스크립트를 직접 실행할 때 사용되는 예시 코드입니다.
+    # 실제 사용 시에는 이 부분을 수정하거나 다른 파일에서 클래스를 import하여 사용하세요.
+    
+    uploader = BidDataUploader(base_url="http://127.0.0.1:8000")
+    excel_file = "your_excel_file.xlsx"
+    await uploader.upload_from_excel(excel_file)
+    pass
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    print("BidDataUploader 클래스가 정의되었습니다.")
+    print("사용 예시:")
+    print("uploader = BidDataUploader()")
+    print("asyncio.run(uploader.upload_from_excel('your_excel_file.xlsx'))")

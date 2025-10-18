@@ -18,11 +18,11 @@ openpyxl = "*"
 xlrd = "*"
 pydantic-settings = "*"
 pytest = "*"
+httpx = "*"
 
 [dev-packages]
 pytest-cov = "*"
 pytest-asyncio = "*"
-httpx = "*"
 black = "*"
 flake8 = "*"
 mypy = "*"

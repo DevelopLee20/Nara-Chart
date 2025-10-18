@@ -70,8 +70,9 @@ app = FastAPI(
 )
 
 # 라우터 등록
-from app.routers import env_var_router
+from app.routers import env_var_router, bid_router
 app.include_router(env_var_router.router)
+app.include_router(bid_router.router)
 
 
 @app.get("/health")

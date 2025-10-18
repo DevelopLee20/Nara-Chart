@@ -2,6 +2,7 @@
 *.lock
 todo
 *.db
+*.xls
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
