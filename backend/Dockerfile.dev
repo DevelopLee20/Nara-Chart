@@ -27,27 +27,9 @@ RUN pip install --no-cache-dir pipenv
 # Pipfile 복사
 COPY Pipfile ./
 
-# Pipfile.lock 생성 및 의존성 설치
+# Pipfile.lock 생성 및 의존성 설치 (개발 패키지 포함)
 RUN pipenv lock && \
-    pipenv install --system --deploy --ignore-pipfile
-
-# 개발용 추가 패키지 설치
-RUN pip install --no-cache-dir \
-    psycopg2-binary \
-    redis \
-    python-dotenv \
-    sqlalchemy \
-    alembic \
-    # 개발 도구
-    black \
-    flake8 \
-    mypy \
-    pytest \
-    pytest-cov \
-    pytest-asyncio \
-    httpx \
-    ipython \
-    debugpy
+    pipenv install --dev --system --deploy --ignore-pipfile
 
 # 개발 환경 포트 노출
 EXPOSE 8000 5678

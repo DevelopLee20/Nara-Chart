@@ -25,18 +25,9 @@ RUN pip install --no-cache-dir pipenv
 # Pipfile 복사
 COPY Pipfile ./
 
-# Pipfile.lock 생성 및 의존성 설치
+# Pipfile.lock 생성 및 의존성 설치 (프로덕션 패키지만)
 RUN pipenv lock && \
     pipenv install --system --deploy --ignore-pipfile
-
-# 프로덕션 패키지 설치
-RUN pip install --no-cache-dir \
-    psycopg2-binary \
-    redis \
-    python-dotenv \
-    sqlalchemy \
-    alembic \
-    gunicorn
 
 # Production stage
 FROM python:3.13-bullseye AS production

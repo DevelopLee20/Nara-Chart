@@ -4,10 +4,38 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+# FastAPI & Server
 fastapi = "*"
-uvicorn = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+gunicorn = "*"
+
+# Database
+sqlalchemy = "*"
+psycopg2-binary = "*"
+alembic = "*"
+
+# Redis
+redis = "*"
+
+# Utils
+python-dotenv = "*"
+pandas = "*"
+openpyxl = "*"
+xlrd = "*"
 
 [dev-packages]
+# Testing
+pytest = "*"
+pytest-cov = "*"
+pytest-asyncio = "*"
+httpx = "*"
+
+# Development Tools
+black = "*"
+flake8 = "*"
+mypy = "*"
+ipython = "*"
+debugpy = "*"
 
 [requires]
 python_version = "3.13"
