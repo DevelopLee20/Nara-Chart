@@ -35,6 +35,64 @@ const computeStats = (data, keys) => {
   return stats;
 };
 
+// EMA 계산 (Exponential Moving Average)
+const calculateEMA = (data, key, span = 10) => {
+  const alpha = 2 / (span + 1);
+  let ema = null;
+
+  return data.map((d) => {
+    const value = d[key];
+    if (value == null || isNaN(value)) {
+      return null;
+    }
+    if (ema === null) {
+      ema = value;
+    } else {
+      ema = alpha * value + (1 - alpha) * ema;
+    }
+    return ema;
+  });
+};
+
+// LOESS 계산 (Locally Weighted Scatterplot Smoothing)
+const calculateLOESS = (data, key, bandwidth = 0.3) => {
+  const values = data.map(d => d[key]);
+  const n = values.length;
+  const result = [];
+
+  // 각 점에 대해 로컬 가중 회귀 수행
+  for (let i = 0; i < n; i++) {
+    const value = values[i];
+    if (value == null || isNaN(value)) {
+      result.push(null);
+      continue;
+    }
+
+    // bandwidth 내의 이웃 점들 찾기
+    const windowSize = Math.max(3, Math.floor(n * bandwidth));
+    const start = Math.max(0, i - Math.floor(windowSize / 2));
+    const end = Math.min(n, start + windowSize);
+
+    // 가중치 계산 (tricube weight function)
+    let weightedSum = 0;
+    let weightSum = 0;
+
+    for (let j = start; j < end; j++) {
+      if (values[j] == null || isNaN(values[j])) continue;
+
+      const distance = Math.abs(i - j) / windowSize;
+      const weight = Math.pow(1 - Math.pow(distance, 3), 3);
+
+      weightedSum += weight * values[j];
+      weightSum += weight;
+    }
+
+    result.push(weightSum > 0 ? weightedSum / weightSum : null);
+  }
+
+  return result;
+};
+
 export default function TrendChart({ rawData, controlledDateFrom, controlledDateTo }) {
   const [mode, setMode] = useState('amount'); // 'amount' | 'ratio'
   const [checked, setChecked] = useState({
@@ -44,6 +102,8 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
     '기초/낙찰': true,
     '추정/낙찰': true,
   });
+  const [showEMA, setShowEMA] = useState(false);
+  const [showLOESS, setShowLOESS] = useState(false);
   const [dateFrom, setDateFrom] = useState(controlledDateFrom || '');
   const [dateTo, setDateTo] = useState(controlledDateTo || '');
 
@@ -55,6 +115,9 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
     if (controlledDateTo !== undefined) setDateTo(controlledDateTo || '');
   }, [controlledDateTo]);
 
+  const amountKeys = useMemo(() => ['추정가격', '기초금액', '낙찰금액'], []);
+  const ratioKeys = useMemo(() => ['기초/낙찰', '추정/낙찰'], []);
+
   const data = useMemo(() => {
     const sorted = [...rawData].sort(
       (a, b) => new Date(a['입찰일']) - new Date(b['입찰일'])
@@ -65,21 +128,45 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
       if (dateTo && iso > dateTo) return false;
       return true;
     });
-    if (mode === 'amount') return filtered;
-    // ratio mode: keep only ratio fields (still keep date and amount fields for tooltip completeness)
-    return filtered.map((d) => ({
-      ...d,
-      '기초/낙찰': toPercent(d['기초/낙찰']),
-      '추정/낙찰': toPercent(d['추정/낙찰']),
-    }));
-  }, [rawData, dateFrom, dateTo, mode]);
 
-  const amountKeys = ['추정가격', '기초금액', '낙찰금액'];
-  const ratioKeys = ['기초/낙찰', '추정/낙찰'];
+    let processedData;
+    if (mode === 'amount') {
+      processedData = filtered;
+    } else {
+      // ratio mode: keep only ratio fields (still keep date and amount fields for tooltip completeness)
+      processedData = filtered.map((d) => ({
+        ...d,
+        '기초/낙찰': toPercent(d['기초/낙찰']),
+        '추정/낙찰': toPercent(d['추정/낙찰']),
+      }));
+    }
+
+    // EMA와 LOESS 계산 및 추가
+    const keysToProcess = mode === 'amount' ? amountKeys : ratioKeys;
+
+    keysToProcess.forEach((key) => {
+      if (showEMA) {
+        const emaValues = calculateEMA(processedData, key, 10);
+        processedData = processedData.map((d, i) => ({
+          ...d,
+          [`${key}_EMA`]: emaValues[i],
+        }));
+      }
+      if (showLOESS) {
+        const loessValues = calculateLOESS(processedData, key, 0.3);
+        processedData = processedData.map((d, i) => ({
+          ...d,
+          [`${key}_LOESS`]: loessValues[i],
+        }));
+      }
+    });
+
+    return processedData;
+  }, [rawData, dateFrom, dateTo, mode, showEMA, showLOESS, amountKeys, ratioKeys]);
 
   const visibleKeys = useMemo(
     () => (mode === 'amount' ? amountKeys : ratioKeys).filter((k) => checked[k]),
-    [mode, checked]
+    [mode, checked, amountKeys, ratioKeys]
   );
 
   const stats = useMemo(
@@ -88,11 +175,11 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
   );
 
   const colors = {
-    추정가격: '#8884d8',
-    기초금액: '#82ca9d',
-    낙찰금액: '#ff7300',
-    '기초/낙찰': '#d62728',
-    '추정/낙찰': '#1f77b4',
+    추정가격: '#3b82f6',  // 파란색
+    기초금액: '#10b981',  // 녹색
+    낙찰금액: '#f59e0b',  // 주황색
+    '기초/낙찰': '#ef4444',  // 빨간색
+    '추정/낙찰': '#8b5cf6',  // 보라색
   };
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -168,6 +255,25 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
             </label>
           ))}
         </div>
+
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginLeft: 'auto' }}>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={showEMA}
+              onChange={() => setShowEMA(!showEMA)}
+            />
+            EMA
+          </label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={showLOESS}
+              onChange={() => setShowLOESS(!showLOESS)}
+            />
+            LOESS
+          </label>
+        </div>
       </div>
 
       {/* Chart */}
@@ -197,6 +303,35 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
                 stroke={colors[k]}
                 dot={false}
                 strokeWidth={2}
+                isAnimationActive={false}
+                yAxisId={0}
+                opacity={showEMA || showLOESS ? 0.2 : 1}
+              />
+            ))}
+            {showEMA && visibleKeys.map((k) => (
+              <Line
+                key={`${k}_EMA`}
+                type="monotone"
+                dataKey={`${k}_EMA`}
+                name={`${k} EMA`}
+                stroke={colors[k]}
+                strokeDasharray="5 5"
+                dot={false}
+                strokeWidth={2.5}
+                isAnimationActive={false}
+                yAxisId={0}
+              />
+            ))}
+            {showLOESS && visibleKeys.map((k) => (
+              <Line
+                key={`${k}_LOESS`}
+                type="monotone"
+                dataKey={`${k}_LOESS`}
+                name={`${k} LOESS`}
+                stroke={colors[k]}
+                strokeDasharray="10 5"
+                dot={false}
+                strokeWidth={3}
                 isAnimationActive={false}
                 yAxisId={0}
               />
