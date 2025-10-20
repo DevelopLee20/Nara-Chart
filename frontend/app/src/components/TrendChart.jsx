@@ -93,6 +93,47 @@ const calculateLOESS = (data, key, bandwidth = 0.3) => {
   return result;
 };
 
+// 미래 날짜 생성 (3개월, 월단위)
+const generateFutureDates = (lastDate, months = 3) => {
+  const dates = [];
+  const last = new Date(lastDate);
+
+  for (let i = 1; i <= months; i++) {
+    const futureDate = new Date(last);
+    futureDate.setMonth(futureDate.getMonth() + i);
+    dates.push(futureDate.toISOString().slice(0, 10));
+  }
+
+  return dates;
+};
+
+// EMA 미래 예측
+const predictEMA = (lastEMA, months = 3) => {
+  // 마지막 EMA 값을 그대로 유지 (평평한 예측)
+  return Array(months).fill(lastEMA);
+};
+
+// LOESS 미래 예측 (선형 외삽)
+const predictLOESS = (loessValues, months = 3) => {
+  // 마지막 유효한 값들로 추세 계산
+  const validValues = loessValues.filter(v => v != null && !isNaN(v));
+  if (validValues.length < 2) return Array(months).fill(validValues[validValues.length - 1] || null);
+
+  // 마지막 5개 값의 평균 기울기 사용
+  const lastN = Math.min(5, validValues.length);
+  const recentValues = validValues.slice(-lastN);
+  const slope = (recentValues[recentValues.length - 1] - recentValues[0]) / (lastN - 1);
+
+  const predictions = [];
+  const lastValue = validValues[validValues.length - 1];
+
+  for (let i = 1; i <= months; i++) {
+    predictions.push(lastValue + slope * i);
+  }
+
+  return predictions;
+};
+
 export default function TrendChart({ rawData, controlledDateFrom, controlledDateTo }) {
   const [mode, setMode] = useState('amount'); // 'amount' | 'ratio'
   const [checked, setChecked] = useState({
@@ -143,10 +184,13 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
 
     // EMA와 LOESS 계산 및 추가
     const keysToProcess = mode === 'amount' ? amountKeys : ratioKeys;
+    const emaByKey = {};
+    const loessByKey = {};
 
     keysToProcess.forEach((key) => {
       if (showEMA) {
         const emaValues = calculateEMA(processedData, key, 10);
+        emaByKey[key] = emaValues;
         processedData = processedData.map((d, i) => ({
           ...d,
           [`${key}_EMA`]: emaValues[i],
@@ -154,12 +198,44 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
       }
       if (showLOESS) {
         const loessValues = calculateLOESS(processedData, key, 0.3);
+        loessByKey[key] = loessValues;
         processedData = processedData.map((d, i) => ({
           ...d,
           [`${key}_LOESS`]: loessValues[i],
         }));
       }
     });
+
+    // 미래 날짜 추가 (EMA 또는 LOESS가 활성화된 경우)
+    if ((showEMA || showLOESS) && processedData.length > 0) {
+      const lastDate = processedData[processedData.length - 1]['입찰일'];
+      const futureDates = generateFutureDates(lastDate, 3);
+
+      futureDates.forEach((futureDate, idx) => {
+        const futurePoint = {
+          '입찰일': futureDate,
+          추정가격: null,
+          기초금액: null,
+          낙찰금액: null,
+          '기초/낙찰': null,
+          '추정/낙찰': null,
+        };
+
+        keysToProcess.forEach((key) => {
+          if (showEMA && emaByKey[key]) {
+            const lastEMA = emaByKey[key][emaByKey[key].length - 1];
+            const predictions = predictEMA(lastEMA, 3);
+            futurePoint[`${key}_EMA`] = predictions[idx];
+          }
+          if (showLOESS && loessByKey[key]) {
+            const predictions = predictLOESS(loessByKey[key], 3);
+            futurePoint[`${key}_LOESS`] = predictions[idx];
+          }
+        });
+
+        processedData.push(futurePoint);
+      });
+    }
 
     return processedData;
   }, [rawData, dateFrom, dateTo, mode, showEMA, showLOESS, amountKeys, ratioKeys]);
@@ -320,6 +396,7 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
                 strokeWidth={2.5}
                 isAnimationActive={false}
                 yAxisId={0}
+                connectNulls={true}
               />
             ))}
             {showLOESS && visibleKeys.map((k) => (
@@ -334,6 +411,7 @@ export default function TrendChart({ rawData, controlledDateFrom, controlledDate
                 strokeWidth={3}
                 isAnimationActive={false}
                 yAxisId={0}
+                connectNulls={true}
               />
             ))}
           </LineChart>
