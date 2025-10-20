@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     # Redis Configuration
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = ""
 
     # Backend Configuration
     APP_ENV: str = "development"
