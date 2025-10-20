@@ -1,7 +1,9 @@
 version: '3.8'
 
 services:
+  # =========================
   # PostgreSQL Database - Production
+  # =========================
   postgres:
     image: postgres:15-alpine
     container_name: nara-chart-postgres-prod
@@ -9,15 +11,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-nara_prod_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_THIS_TO_STRONG_PASSWORD_MIN_32_CHARS}
       POSTGRES_DB: ${POSTGRES_DB:-nara_chart_production}
-      # 성능 최적화
       POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
     ports:
-      # 프로덕션에서는 외부 노출 최소화 (필요시 주석 해제)
-      # - "${POSTGRES_PORT:-5432}:5432"
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
-      # 백업 디렉토리
       - ./backups/postgres:/backups
     networks:
       - nara-network-prod
@@ -27,7 +25,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    # 리소스 제한
     deploy:
       resources:
         limits:
@@ -37,12 +34,14 @@ services:
           cpus: '1'
           memory: 512M
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
 
+  # =========================
   # Redis Cache - Production
+  # =========================
   redis:
     image: redis:7-alpine
     container_name: nara-chart-redis-prod
@@ -56,12 +55,9 @@ services:
       --save 300 10
       --save 60 10000
     ports:
-      # 프로덕션에서는 외부 노출 최소화
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_prod_data:/data
-      # Redis 설정 파일 (옵션)
-      # - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - nara-network-prod
     healthcheck:
@@ -79,23 +75,24 @@ services:
           cpus: '0.5'
           memory: 256M
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
 
+  # =========================
   # FastAPI Backend - Production
+  # =========================
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: production
       args:
-        - BUILD_DATE=${BUILD_DATE}
-        - VERSION=${VERSION:-1.0.0}
+        BUILD_DATE: ${BUILD_DATE}
+        VERSION: ${VERSION:-1.0.0}
     container_name: nara-chart-backend-prod
     environment:
-      # Database
       DATABASE_URL: postgresql://${POSTGRES_USER:-nara_prod_user}:${POSTGRES_PASSWORD:-CHANGE_THIS_TO_STRONG_PASSWORD_MIN_32_CHARS}@postgres:5432/${POSTGRES_DB:-nara_chart_production}
       POSTGRES_USER: ${POSTGRES_USER:-nara_prod_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_THIS_TO_STRONG_PASSWORD_MIN_32_CHARS}
@@ -104,26 +101,21 @@ services:
       POSTGRES_PORT: 5432
       DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-20}
       DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-10}
-      # Redis
       REDIS_URL: redis://:${REDIS_PASSWORD:-CHANGE_THIS_TO_STRONG_REDIS_PASSWORD_MIN_32_CHARS}@redis:6379/0
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-CHANGE_THIS_TO_STRONG_REDIS_PASSWORD_MIN_32_CHARS}
       REDIS_CACHE_TTL: ${REDIS_CACHE_TTL:-3600}
-      # App settings
       APP_ENV: ${APP_ENV:-production}
       DEBUG: ${DEBUG:-false}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SECRET_KEY: ${SECRET_KEY:-CHANGE_THIS_TO_RANDOM_SECRET_KEY_USE_OPENSSL_RAND_HEX_32}
-      # Security
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-yourdomain.com,www.yourdomain.com}
       CORS_ORIGINS: ${CORS_ORIGINS:-https://yourdomain.com,https://www.yourdomain.com}
-      # Workers
       WORKERS: ${WORKERS:-4}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      # 로그만 마운트
       - ./logs/backend:/app/logs
       - backend_prod_data:/app/data
     depends_on:
@@ -159,32 +151,31 @@ services:
           memory: 512M
       replicas: 1
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "50m"
         max-file: "5"
 
+  # =========================
   # React Frontend - Production
+  # =========================
   frontend:
     build:
       context: ./frontend/app
       dockerfile: Dockerfile
       target: production
       args:
-        - REACT_APP_API_URL=${REACT_APP_API_URL}
-        - BUILD_DATE=${BUILD_DATE}
-        - VERSION=${VERSION:-1.0.0}
+        REACT_APP_API_URL: ${REACT_APP_API_URL}
+        BUILD_DATE: ${BUILD_DATE}
+        VERSION: ${VERSION:-1.0.0}
     container_name: nara-chart-frontend-prod
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
+      NODE_ENV: ${NODE_ENV:-production}
     ports:
       - "${FRONTEND_PORT:-80}:80"
       - "${FRONTEND_SSL_PORT:-443}:443"
     volumes:
-      # Nginx 로그
       - ./logs/nginx:/var/log/nginx
-      # SSL 인증서 (Let's Encrypt 등)
-      # - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - backend
     networks:
@@ -205,12 +196,14 @@ services:
           cpus: '0.5'
           memory: 128M
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "50m"
         max-file: "5"
 
-  # Nginx Reverse Proxy (옵션 - SSL 종료 및 로드 밸런싱)
+  # =========================
+  # Nginx Reverse Proxy
+  # =========================
   nginx-proxy:
     image: nginx:alpine
     container_name: nara-chart-nginx-proxy
@@ -231,12 +224,14 @@ services:
     profiles:
       - proxy
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "50m"
         max-file: "5"
 
-  # 백업 서비스 (Cron 기반)
+  # =========================
+  # Backup Service
+  # =========================
   backup:
     image: postgres:15-alpine
     container_name: nara-chart-backup
@@ -257,18 +252,21 @@ services:
     profiles:
       - backup
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
 
+# =========================
+# 네트워크 & 볼륨 설정
+# =========================
 networks:
   nara-network-prod:
     driver: bridge
     name: nara-network-prod
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 172.30.0.0/16   # ← 기존 172.20.0.0/16 충돌 방지용으로 변경
 
 volumes:
   postgres_prod_data:
