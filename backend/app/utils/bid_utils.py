@@ -105,8 +105,29 @@ class BidDataUploader:
         numeric_cols = ["estimated_price", "base_price", "winning_price", "base_winning_rate", "estimated_winning_rate"]
         for col in numeric_cols:
             if col in df.columns:
-                # 숫자로 변환, 변환할 수 없는 값은 NaN으로
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+                def clean_numeric(val):
+                    """텍스트 형식의 숫자를 정제하여 float로 변환"""
+                    if pd.isna(val):
+                        return None
+
+                    # 이미 숫자인 경우
+                    if isinstance(val, (int, float)):
+                        return float(val) if not pd.isna(val) else None
+
+                    # 문자열 처리
+                    str_val = str(val).strip()
+                    if not str_val or str_val.lower() in ['', 'nan', 'none', 'null', '-']:
+                        return None
+
+                    # 쉼표, 공백, 원화 기호 등 제거
+                    str_val = str_val.replace(',', '').replace(' ', '').replace('원', '').replace('₩', '').replace('\\', '')
+
+                    try:
+                        return float(str_val)
+                    except:
+                        return None
+
+                df[col] = df[col].apply(clean_numeric)
 
         # 정의된 컬럼만 선택 (추가 컬럼 제거)
         valid_cols = [v for v in filtered_mapping.values() if v in df.columns]
