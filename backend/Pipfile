@@ -8,6 +8,7 @@ name = "pypi"
 fastapi = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 gunicorn = "*"
+python-multipart = "*"
 sqlalchemy = "*"
 psycopg2-binary = "*"
 alembic = "*"

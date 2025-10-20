@@ -13,6 +13,7 @@ class BidDataUploader:
         self.base_url = base_url.rstrip('/')
         self.api_endpoint = f"{self.base_url}/api/bids/"
         self.column_mapping = {
+            "번호": None,  # 무시 (자동 생성)
             "타입": "bid_type",
             "참가마감": "participation_deadline",
             "투찰마감": "bid_deadline",
@@ -34,13 +35,29 @@ class BidDataUploader:
         """
         데이터프레임을 API 스키마에 맞게 전처리합니다.
         """
-        df = df.rename(columns=self.column_mapping)
-        
+        # None이 아닌 컬럼만 필터링 (번호 컬럼 등 무시할 컬럼 제외)
+        filtered_mapping = {k: v for k, v in self.column_mapping.items() if v is not None}
+
+        # 컬럼명 변경
+        df = df.rename(columns=filtered_mapping)
+
+        # None으로 매핑된 컬럼 삭제 (예: 번호)
+        cols_to_drop = [k for k, v in self.column_mapping.items() if v is None and k in df.columns]
+        if cols_to_drop:
+            df = df.drop(columns=cols_to_drop)
+
         # 필수 컬럼 확인
         required_cols = ["title", "bid_number"]
-        for col in required_cols:
-            if col not in df.columns:
-                raise ValueError(f"필수 컬럼이 누락되었습니다: {col}")
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            # 원본 컬럼명 표시
+            original_names = [k for k, v in filtered_mapping.items() if v in missing_cols]
+            raise ValueError(
+                f"필수 컬럼이 누락되었습니다.\n"
+                f"누락된 컬럼: {missing_cols}\n"
+                f"엑셀 파일에 필요한 컬럼: {original_names}\n"
+                f"현재 엑셀 컬럼: {list(df.columns)}"
+            )
 
         # 날짜 컬럼 포맷 변경
         date_cols = ["participation_deadline", "bid_deadline", "bid_date"]
@@ -52,7 +69,6 @@ class BidDataUploader:
                 df[col] = s.dt.strftime('%Y-%m-%d')
                 df.loc[s.isna(), col] = None
 
-
         # 숫자 컬럼 처리
         numeric_cols = ["estimated_price", "base_price", "winning_price", "base_winning_rate", "estimated_winning_rate"]
         for col in numeric_cols:
@@ -60,10 +76,14 @@ class BidDataUploader:
                 # 숫자로 변환, 변환할 수 없는 값은 NaN으로
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
+        # 정의된 컬럼만 선택 (추가 컬럼 제거)
+        valid_cols = [v for v in filtered_mapping.values() if v in df.columns]
+        df = df[valid_cols]
+
         # DataFrame 전체의 NaN 값을 Python의 None으로 변환
         # to_dict() 전에 실행해야 JSON 직렬화 오류를 막을 수 있음
         df = df.astype(object).where(df.notna(), None)
-        
+
         return df.to_dict(orient="records")
 
     async def upload_from_excel(self, file_path: str):

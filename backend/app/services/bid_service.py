@@ -208,3 +208,45 @@ class BidService:
             "average_base_winning_rate": float(avg_base_winning_rate),
             "average_estimated_winning_rate": float(avg_estimated_winning_rate)
         }
+
+    def delete_all_bids(self) -> int:
+        """
+        모든 입찰 데이터 삭제
+
+        Returns:
+            삭제된 레코드 수
+        """
+        deleted_count = self.db.query(DataModel).delete()
+        self.db.commit()
+        return deleted_count
+
+    def bulk_create_bids(self, bids_data: List[dict]) -> tuple[int, int]:
+        """
+        여러 입찰 데이터 일괄 생성
+
+        Args:
+            bids_data: 입찰 데이터 딕셔너리 리스트
+
+        Returns:
+            (성공 개수, 실패 개수) 튜플
+        """
+        success_count = 0
+        fail_count = 0
+
+        for bid_dict in bids_data:
+            try:
+                bid = DataModel(**bid_dict)
+                self.db.add(bid)
+                success_count += 1
+            except Exception as e:
+                fail_count += 1
+                print(f"데이터 추가 실패: {e}")
+                continue
+
+        try:
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            raise Exception(f"데이터베이스 커밋 실패: {e}")
+
+        return success_count, fail_count

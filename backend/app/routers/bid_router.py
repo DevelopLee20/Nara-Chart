@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.database import get_db
@@ -10,6 +10,9 @@ from app.schemas.bid_schemas import (
     BidListResponse,
     BidOperationResponse
 )
+from app.utils.bid_utils import BidDataUploader
+import tempfile
+import os
 
 router = APIRouter(
     prefix="/api/bids",
@@ -232,3 +235,71 @@ def delete_bid(
         success=True,
         message=f"입찰 데이터 ID {bid_id} 삭제 완료"
     )
+
+
+@router.post("/upload", response_model=BidOperationResponse)
+async def upload_excel(
+    file: UploadFile = File(...),
+    service: BidService = Depends(_get_service)
+):
+    """
+    엑셀 파일 업로드 - 모든 데이터 삭제 후 엑셀 데이터 일괄 등록
+
+    - 기존의 모든 입찰 데이터를 삭제합니다
+    - 업로드된 엑셀 파일의 데이터를 데이터베이스에 저장합니다
+    - 지원 파일 형식: .xlsx, .xls
+    """
+    # 파일 확장자 검증
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="파일명이 없습니다."
+        )
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ['.xlsx', '.xls']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="엑셀 파일만 업로드 가능합니다. (.xlsx, .xls)"
+        )
+
+    # 임시 파일로 저장
+    temp_file = None
+    try:
+        # 임시 파일 생성
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp:
+            temp_file = temp.name
+            content = await file.read()
+            temp.write(content)
+
+        # BidDataUploader를 사용하여 엑셀 데이터 파싱
+        uploader = BidDataUploader()
+        import pandas as pd
+        df = pd.read_excel(temp_file)
+        records = uploader._preprocess_data(df)
+
+        # 모든 기존 데이터 삭제
+        deleted_count = service.delete_all_bids()
+
+        # 새 데이터 일괄 등록
+        success_count, fail_count = service.bulk_create_bids(records)
+
+        return BidOperationResponse(
+            success=True,
+            message=f"업로드 완료: 기존 {deleted_count}건 삭제, {success_count}건 추가 성공, {fail_count}건 실패"
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"엑셀 파일 처리 오류: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"파일 업로드 실패: {str(e)}"
+        )
+    finally:
+        # 임시 파일 삭제
+        if temp_file and os.path.exists(temp_file):
+            os.unlink(temp_file)
