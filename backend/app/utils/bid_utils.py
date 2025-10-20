@@ -63,11 +63,43 @@ class BidDataUploader:
         date_cols = ["participation_deadline", "bid_deadline", "bid_date"]
         for col in date_cols:
             if col in df.columns:
-                # datetime으로 변환, 실패 시 NaT
-                s = pd.to_datetime(df[col], errors='coerce')
-                # NaT가 아닌 경우에만 날짜 형식으로 변환, NaT는 None으로 남김
-                df[col] = s.dt.strftime('%Y-%m-%d')
-                df.loc[s.isna(), col] = None
+                def parse_date(val):
+                    """날짜 파싱 헬퍼: 다양한 형식 처리"""
+                    if pd.isna(val):
+                        return None
+
+                    # 문자열로 변환
+                    date_str = str(val).strip()
+                    if not date_str:
+                        return None
+
+                    try:
+                        # "24-01-18 11:00" 또는 "24-01-18" 형식 처리
+                        # 공백이나 시간이 있으면 날짜 부분만 추출
+                        date_part = date_str.split()[0] if ' ' in date_str else date_str
+
+                        # "-"로 분리
+                        parts = date_part.split('-')
+                        if len(parts) == 3:
+                            year, month, day = parts
+                            # 2자리 연도를 4자리로 변환 (00-99 -> 2000-2099)
+                            if len(year) == 2:
+                                year = f"20{year}"
+                            return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                    except:
+                        pass
+
+                    # 위 방법이 실패하면 pandas의 기본 파싱 시도
+                    try:
+                        parsed = pd.to_datetime(date_str, errors='coerce')
+                        if pd.notna(parsed):
+                            return parsed.strftime('%Y-%m-%d')
+                    except:
+                        pass
+
+                    return None
+
+                df[col] = df[col].apply(parse_date)
 
         # 숫자 컬럼 처리
         numeric_cols = ["estimated_price", "base_price", "winning_price", "base_winning_rate", "estimated_winning_rate"]
