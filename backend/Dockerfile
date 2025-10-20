@@ -30,7 +30,7 @@ RUN pipenv lock && \
     pipenv install --system --deploy --ignore-pipfile
 
 # Production stage
-FROM python:3.13-bullseye AS production
+FROM python:3.12-bullseye AS production
 
 # 빌드 인자
 ARG BUILD_DATE

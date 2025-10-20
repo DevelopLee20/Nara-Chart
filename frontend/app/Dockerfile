@@ -1,7 +1,7 @@
 # Frontend Dockerfile for React - Multi-stage build
 
 # Stage 1: Build the React application
-FROM node:18-alpine AS build
+FROM node:18-alpine AS build-stage
 
 # 작업 디렉토리 설정
 WORKDIR /app
@@ -22,14 +22,20 @@ ENV REACT_APP_API_URL=$REACT_APP_API_URL
 # 프로덕션 빌드
 RUN npm run build
 
-# Stage 2: Nginx로 서빙
-FROM nginx:alpine
+# Stage 2: Production - Nginx로 서빙
+FROM nginx:alpine AS production
+
+# 빌드 인자
+ARG BUILD_DATE
+ARG VERSION
+LABEL build_date=$BUILD_DATE
+LABEL version=$VERSION
 
 # Nginx 설정 파일 복사 (커스텀 설정이 필요한 경우)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # 빌드된 파일을 Nginx의 기본 디렉토리로 복사
-COPY --from=build /app/build /usr/share/nginx/html
+COPY --from=build-stage /app/build /usr/share/nginx/html
 
 # 포트 노출
 EXPOSE 80

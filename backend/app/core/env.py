@@ -1,15 +1,21 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+import os
 
 
 class Settings(BaseSettings):
     """
     애플리케이션 환경 변수 설정
+    환경 변수를 우선적으로 사용하고, .env 파일이 있으면 보조적으로 사용
     """
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # .env 파일이 없어도 에러 발생하지 않도록 설정
+        env_file=".env" if os.path.exists(".env") else None,
         env_file_encoding="utf-8",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore",
+        # 환경 변수를 .env 파일보다 우선
+        env_prefix=""
     )
 
     # 애플리케이션 기본 설정
