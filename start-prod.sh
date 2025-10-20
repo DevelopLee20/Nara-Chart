@@ -22,7 +22,7 @@ if [ ! -f .env.prod ]; then
 fi
 
 # docker-compose-prod.yml 파일 확인
-if [ ! -f docker-compose-prod.yml ]; then
+if [ ! -f docker compose-prod.yml ]; then
     echo -e "${RED}❌ docker-compose-prod.yml 파일이 없습니다.${NC}"
     exit 1
 fi
@@ -53,7 +53,7 @@ if [ "$(docker ps -q -f name=nara-chart)" ]; then
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
     echo -e "${BLUE}💾 데이터베이스 백업 중...${NC}"
-    docker-compose -f docker-compose-prod.yml --env-file .env.prod exec -T postgres pg_dump -U ${POSTGRES_USER} ${POSTGRES_DB} > "backups/backup_${TIMESTAMP}.sql" 2>/dev/null
+    docker compose -f docker-compose-prod.yml --env-file .env.prod exec -T postgres pg_dump -U ${POSTGRES_USER} ${POSTGRES_DB} > "backups/backup_${TIMESTAMP}.sql" 2>/dev/null
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ 백업 완료: backups/backup_${TIMESTAMP}.sql${NC}"
@@ -63,7 +63,7 @@ if [ "$(docker ps -q -f name=nara-chart)" ]; then
 
     echo ""
     echo -e "${YELLOW}🛑 기존 컨테이너 중지 중...${NC}"
-    docker-compose -f docker-compose-prod.yml --env-file .env.prod down
+    docker compose -f docker-compose-prod.yml --env-file .env.prod down
     echo ""
 fi
 
@@ -74,7 +74,7 @@ echo -e "${GREEN}🚀 프로덕션 서비스 시작 중...${NC}"
 echo ""
 
 # Docker Compose 실행
-docker-compose -f docker-compose-prod.yml --env-file .env.prod $PROFILES up -d --build
+docker compose -f docker-compose-prod.yml --env-file .env.prod $PROFILES up -d --build
 
 # 서비스가 준비될 때까지 대기
 echo ""
@@ -84,7 +84,7 @@ sleep 5
 # 컨테이너 상태 확인
 echo ""
 echo -e "${BLUE}📊 컨테이너 상태:${NC}"
-docker-compose -f docker-compose-prod.yml --env-file .env.prod ps
+docker compose -f docker-compose-prod.yml --env-file .env.prod ps
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
